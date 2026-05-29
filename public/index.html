@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="MPCC（Marukome Product Code Checker）マルコメ商品コードチェッカー。商品名・商品コード・ケース数・入り数の整合性を検証します。">
+  <title>MPCC | Marukome Product Code Checker</title>
+  <link rel="stylesheet" href="/static/mpcc.css">
+</head>
+<body>
+
+<!-- ============================================================
+     ヘッダー（全ページ共通）
+     ============================================================ -->
+<header class="site-header" role="banner">
+  <div class="site-header__inner">
+    <a href="/" class="site-header__logo" id="header-logo">
+      <span class="site-header__badge">MPCC</span>
+      <span class="site-header__title">Marukome Product Code Checker</span>
+    </a>
+    <nav class="site-header__nav" aria-label="ページナビゲーション">
+      <button class="btn btn--ghost btn--small" id="back-btn" style="display:none;" aria-label="入力ページに戻る">
+        ← 入力に戻る
+      </button>
+    </nav>
+  </div>
+</header>
+
+<!-- ============================================================
+     ローディングオーバーレイ
+     ============================================================ -->
+<div class="loading-overlay" id="loading-overlay" role="status" aria-live="polite">
+  <div class="loading-overlay__spinner" aria-hidden="true"></div>
+  <div class="loading-overlay__text">チェック処理中...</div>
+</div>
+
+<!-- ============================================================
+     入力ページ
+     ============================================================ -->
+<main id="page-input" class="page" role="main">
+  <div class="main-content">
+
+    <!-- ヒーロー -->
+    <header class="input-hero">
+      <h1 class="input-hero__title">商品コードチェッカー</h1>
+      <p class="input-hero__subtitle">商品名・商品コード・ケース数・入り数の整合性を一括チェックします</p>
+    </header>
+
+    <!-- 入力ガイド -->
+    <div class="input-guide" role="note">
+      <strong>入力フォーマット：</strong>
+      商品名（商品コード）：必要なケース数ケース：必要な入り数<br>
+      例）プラス糀 生塩糀（412294）：2ケース：64<br>
+      <span style="opacity:0.75;">複数行まとめて貼り付けて一括チェックできます。Ctrl+Enter でもチェックできます。</span>
+    </div>
+
+    <!-- メイン入力カード -->
+    <section class="input-card" aria-labelledby="input-label">
+      <label class="input-card__label" id="input-label" for="input-textarea">
+        商品情報を入力（複数行対応）
+      </label>
+      <p class="input-card__desc">
+        1行ごとに「商品名（商品コード）：ケース数ケース：入り数」の形式で入力してください。<br>
+        全角・半角混在、表記ゆれ、余分なスペースなどは自動で吸収します。
+      </p>
+
+      <div class="input-format-hint" aria-hidden="true">
+        フォーマット：商品名（コード）：Xケース：Y<br>
+        例）プラス糀 生塩糀（412294）：2ケース：64
+      </div>
+
+      <textarea
+        id="input-textarea"
+        class="input-textarea"
+        placeholder="プラス糀 生塩糀(412294)：2ケース：64
+プラス糀 糀甘酒LL オリゴ糖(412182)：3ケース：54
+FD タニタ食堂監修 オクラとめかぶ(671333)：1ケース：80
+プラス糀 生塩糀パウダー ボトル(412310)：1ケース：24"
+        spellcheck="false"
+        autocomplete="off"
+        aria-label="商品情報入力エリア"
+        aria-describedby="input-label"
+        rows="12"
+      ></textarea>
+
+      <!-- 入力エラーメッセージ -->
+      <div
+        id="input-error"
+        role="alert"
+        style="display:none; margin-top:8px; color:var(--color-error); font-size:13px; font-weight:600;"
+        aria-live="assertive"
+      ></div>
+
+      <!-- 行数表示 -->
+      <div style="margin-top:6px; text-align:right;">
+        <span id="line-count" style="font-size:12px; color:var(--color-text-muted);"></span>
+      </div>
+
+      <!-- アクションボタン -->
+      <div class="input-actions">
+        <button class="btn btn--primary" id="check-btn" type="button">
+          <span aria-hidden="true">🔍</span>
+          チェックする
+        </button>
+        <button class="btn btn--secondary" id="sample-all-btn" type="button">
+          全サンプルを入力
+        </button>
+        <button class="btn btn--ghost btn--small" type="button" onclick="document.getElementById('input-textarea').value=''; document.getElementById('line-count').textContent='';">
+          クリア
+        </button>
+      </div>
+    </section>
+
+    <!-- サンプル入力セクション -->
+    <section class="sample-section" aria-labelledby="sample-label">
+      <h2 class="sample-section__title" id="sample-label">サンプルデータ</h2>
+      <div class="sample-chips" role="list">
+        <button
+          class="sample-chip"
+          data-sample="normal"
+          type="button"
+          role="listitem"
+          title="問題なし3件のサンプルを追加"
+        >
+          ✓ 正常例
+        </button>
+        <button
+          class="sample-chip"
+          data-sample="variant"
+          type="button"
+          role="listitem"
+          title="表記ゆれのサンプルを追加"
+        >
+          ! 表記ゆれ例
+        </button>
+        <button
+          class="sample-chip"
+          data-sample="mismatch"
+          type="button"
+          role="listitem"
+          title="入り数不整合のサンプルを追加"
+        >
+          ✗ 不整合例
+        </button>
+        <button
+          class="sample-chip"
+          data-sample="similar"
+          type="button"
+          role="listitem"
+          title="類似名称の注意サンプルを追加"
+        >
+          ! 類似名称注意例
+        </button>
+        <button
+          class="sample-chip"
+          data-sample="unknown"
+          type="button"
+          role="listitem"
+          title="未知商品（外部参照）のサンプルを追加"
+        >
+          ? 未知商品例
+        </button>
+      </div>
+    </section>
+
+    <!-- 補足説明 -->
+    <div class="notice-banner" role="note">
+      <strong>ご注意：</strong>
+      初期マスタに登録されていない商品は「未知商品」として扱われ、
+      <a href="https://www.marukome.co.jp/business/product/" target="_blank" rel="noopener noreferrer">マルコメ業務用商品ページ</a>
+      との自動照合を試みます。照合結果は参考情報であり、最終確認は同ページでお願いします。
+    </div>
+
+  </div><!-- /.main-content -->
+</main>
+
+<!-- ============================================================
+     結果ページ
+     ============================================================ -->
+<main id="page-result" class="page" role="main" aria-label="チェック結果">
+  <div class="main-content">
+
+    <!-- 結果ヘッダー -->
+    <header class="result-header">
+      <h1 class="result-header__title">チェック結果</h1>
+      <button class="btn btn--secondary" id="back-btn-top" type="button" onclick="document.getElementById('back-btn').click()">
+        ← 入力ページに戻る
+      </button>
+    </header>
+
+    <!-- サマリーセクション -->
+    <section id="summary-section" aria-label="全体サマリー">
+      <!-- JS で注入 -->
+    </section>
+
+    <!-- 結果一覧 -->
+    <section aria-label="商品ごとの判定一覧">
+      <h2 class="result-section__title">商品ごとの判定一覧</h2>
+      <p style="font-size:13px; color:var(--color-text-muted); margin-bottom:16px;">
+        各行をクリックすると詳細が展開されます。エラー・注意・未知商品は自動で展開されています。
+      </p>
+      <div class="result-list" id="result-list" role="list" aria-live="polite">
+        <!-- JS で注入 -->
+      </div>
+    </section>
+
+    <!-- 戻るボタン（下部） -->
+    <div style="margin-top:32px; display:flex; justify-content:center;">
+      <button class="btn btn--secondary" type="button" onclick="document.getElementById('back-btn').click()">
+        ← 入力ページに戻る
+      </button>
+    </div>
+
+  </div><!-- /.main-content -->
+</main>
+
+<!-- ============================================================
+     フッター
+     ============================================================ -->
+<footer class="site-footer" role="contentinfo">
+  <div>
+    <strong>MPCC</strong> — Marukome Product Code Checker
+    &nbsp;|&nbsp;
+    試作バージョン
+    &nbsp;|&nbsp;
+    判定結果は参考情報です。最終確認は
+    <a href="https://www.marukome.co.jp/business/product/" target="_blank" rel="noopener noreferrer" style="color:var(--color-primary);">マルコメ業務用商品ページ</a>
+    にてお願いします。
+  </div>
+</footer>
+
+<!-- ============================================================
+     スクリプト（ESモジュール）
+     ============================================================ -->
+<script type="module" src="/js/app.js"></script>
+
+<!-- ヘッダーロゴクリックで入力ページへ -->
+<script>
+  document.getElementById('header-logo').addEventListener('click', function(e) {
+    e.preventDefault();
+    const backBtn = document.getElementById('back-btn');
+    if (backBtn && backBtn.style.display !== 'none') {
+      backBtn.click();
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  });
+
+  // 戻るボタンの表示制御（結果ページ表示時に表示）
+  const observer = new MutationObserver(() => {
+    const resultPage = document.getElementById('page-result');
+    const backBtn = document.getElementById('back-btn');
+    if (resultPage && backBtn) {
+      backBtn.style.display = resultPage.classList.contains('active') ? '' : 'none';
+    }
+  });
+  const resultPage = document.getElementById('page-result');
+  if (resultPage) {
+    observer.observe(resultPage, { attributes: true, attributeFilter: ['class'] });
+  }
+</script>
+
+</body>
+</html>

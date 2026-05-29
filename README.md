@@ -1,21 +1,87 @@
-```txt
-npm install
-npm run dev
+# MPCC — Marukome Product Code Checker
+
+## プロジェクト概要
+
+- **名称**: MPCC（Marukome Product Code Checker）
+- **目的**: マルコメ商品の「商品名（商品コード）：ケース数：入り数」入力データのチェックツール
+- **種別**: フロントエンドSPA（Cloudflare Pages静的配信）
+
+## 現在実装済みの機能
+
+- ✅ 入力ページ（複数行貼り付け対応テキストエリア）
+- ✅ 結果ページ（全体サマリー + 商品ごと判定一覧）
+- ✅ 入力行の解析（表記ゆれ吸収：全角・半角混在、余分スペース等）
+- ✅ 既知商品マスタ（30商品内蔵）との照合
+- ✅ ケース数×入り数の整合性チェック
+- ✅ 商品名の表記ゆれ検知（レーベンシュタイン類似度）
+- ✅ 類似名称商品の注意表示（412171/412209ペア等）
+- ✅ 未知商品の外部参照（内蔵キャッシュ + CORSプロキシ経由のマルコメサイト参照）
+- ✅ サンプルデータ（正常/表記ゆれ/不整合/類似名称/未知商品）
+- ✅ アコーディオン式詳細表示
+- ✅ レスポンシブ対応（モバイル・デスクトップ）
+- ✅ Ctrl+Enter ショートカット
+
+## 画面構成
+
+| 画面 | パス | 役割 |
+|------|------|------|
+| 入力ページ | / | 商品情報の貼り付け・入力 |
+| 結果ページ | /#result | 判定サマリー＋商品ごとカード表示 |
+
+## データアーキテクチャ
+
+| ファイル | 役割 |
+|---------|------|
+| `public/js/master.js` | 商品マスタ（30件）・正規化・類似検索 |
+| `public/js/parser.js` | 入力テキスト解析（行ごとパース） |
+| `public/js/checker.js` | 判定ロジック（整合性・表記ゆれ・類似名称） |
+| `public/js/external.js` | 未知商品の外部参照（マルコメサイト照合） |
+| `public/js/app.js` | SPAコントローラー・画面レンダリング |
+| `public/static/mpcc.css` | スタイルシート |
+| `public/index.html` | SPAルートHTML |
+
+## 判定ステータス
+
+| ステータス | 色 | 意味 |
+|-----------|-----|------|
+| 問題なし | 緑 | ケース数×入り数が整合 |
+| 注意 | オレンジ | 表記ゆれ・類似名称注意 |
+| エラー | 赤 | ケース数×入り数が不整合 |
+| 未知商品 | グレー | マスタに存在しない商品 |
+| 解析エラー | 紫 | 入力フォーマットが読み取れない |
+
+## 技術スタック
+
+- **フロントエンド**: HTML/CSS/JavaScript（ESモジュール）
+- **ホスティング**: Cloudflare Pages（wrangler pages dev）
+- **依存ライブラリ**: なし（Pure JS）
+
+## 開発・起動方法
+
+```bash
+# 開発サーバー起動（PM2）
+cd /home/user/webapp
+pm2 start ecosystem.config.cjs
+
+# または直接起動
+npx wrangler pages dev public --ip 0.0.0.0 --port 3000
 ```
 
-```txt
-npm run deploy
-```
+## 未実装・今後の改善案
 
-[For generating/synchronizing types based on your Worker configuration run](https://developers.cloudflare.com/workers/wrangler/commands/#types):
+- [ ] マルコメサイトのCORSプロキシなしリアルタイム照合（Cloudflare Worker経由）
+- [ ] 商品マスタのCSVインポート機能
+- [ ] チェック結果のCSVエクスポート
+- [ ] マスタの動的更新・編集機能
+- [ ] 商品コード候補の検索・オートコンプリート
+- [ ] 履歴保存（localStorage）
 
-```txt
-npm run cf-typegen
-```
+## 配置・デプロイ
 
-Pass the `CloudflareBindings` as generics when instantiation `Hono`:
+- **プラットフォーム**: Cloudflare Pages
+- **ビルド**: ビルド不要（静的SPA）
+- **デプロイコマンド**: `npx wrangler pages deploy public --project-name mpcc`
 
-```ts
-// src/index.ts
-const app = new Hono<{ Bindings: CloudflareBindings }>()
-```
+## 最終更新
+
+2026-05-29 — 初期試作版

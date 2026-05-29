@@ -2,10 +2,11 @@
   "name": "webapp",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "wrangler pages dev",
-    "deploy": "npm run build && wrangler pages deploy",
+    "dev": "wrangler pages dev public --ip 0.0.0.0 --port 3000",
+    "dev:sandbox": "wrangler pages dev public --ip 0.0.0.0 --port 3000",
+    "build": "echo 'Static SPA - no build step required'",
+    "preview": "wrangler pages dev public",
+    "deploy": "wrangler pages deploy public --project-name mpcc",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings"
   },
   "dependencies": {
