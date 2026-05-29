@@ -6,6 +6,14 @@
 import { parseMultiLine } from './parser.js';
 import { checkAll, calcSummary, STATUS } from './checker.js';
 import { lookupExternalProduct } from './external.js';
+import { isCustomMasterActive, getActiveMaster } from './master.js';
+import {
+  parseCsvToMaster,
+  masterToCsv,
+  applyCustomMaster,
+  applyInitialMaster,
+  getInitialMasterAsCsv
+} from './master-editor.js';
 
 // ============================================================
 // サンプルデータ
@@ -41,6 +49,17 @@ let textarea, checkBtn, sampleAllBtn;
 let resultList, summaryEl;
 let loadingOverlay;
 let backBtn;
+// マスタ管理モーダル関連
+let masterEditBtn, masterModal, masterModalClose, masterCancelBtn;
+let masterApplyBtn, masterResetBtn;
+let masterCsvTextarea, masterFileInput, fileDropZone;
+let masterFileTextarea, fileReadResult, fileReadInfo;
+let currentMasterTextarea, masterValidationResult;
+let masterStatusBadge, modalMasterStatus;
+let copyCurrentMasterBtn, downloadCurrentMasterBtn;
+// 現在モーダルに読み込まれているCSVテキスト（貼り付けorファイル）
+let _pendingCsvText = '';
+let _activeTab = 'paste';
 
 // ============================================================
 // 初期化
@@ -55,6 +74,28 @@ document.addEventListener('DOMContentLoaded', () => {
   summaryEl = $('summary-section');
   loadingOverlay = $('loading-overlay');
   backBtn = $('back-btn');
+
+  // マスタ管理モーダル関連
+  masterEditBtn           = $('master-edit-btn');
+  masterModal             = $('master-modal');
+  masterModalClose        = $('master-modal-close');
+  masterCancelBtn         = $('master-cancel-btn');
+  masterApplyBtn          = $('master-apply-btn');
+  masterResetBtn          = $('master-reset-btn');
+  masterCsvTextarea       = $('master-csv-textarea');
+  masterFileInput         = $('master-file-input');
+  fileDropZone            = $('file-drop-zone');
+  masterFileTextarea      = $('master-file-textarea');
+  fileReadResult          = $('file-read-result');
+  fileReadInfo            = $('file-read-info');
+  currentMasterTextarea   = $('current-master-textarea');
+  masterValidationResult  = $('master-validation-result');
+  masterStatusBadge       = $('master-status-badge');
+  modalMasterStatus       = $('modal-master-status');
+  copyCurrentMasterBtn    = $('copy-current-master-btn');
+  downloadCurrentMasterBtn= $('download-current-master-btn');
+
+  initMasterModal();
 
   // URLハッシュで初期状態を判断
   if (window.location.hash === '#result') {
@@ -94,6 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   showPage('input');
+  updateMasterStatusBadge();
 });
 
 // ============================================================
@@ -524,4 +566,320 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+// ============================================================
+// マスタ管理モーダル
+// ============================================================
+
+function initMasterModal() {
+  // 開くボタン
+  masterEditBtn.addEventListener('click', openMasterModal);
+
+  // 閉じる系
+  masterModalClose.addEventListener('click', closeMasterModal);
+  masterCancelBtn.addEventListener('click', closeMasterModal);
+  masterModal.addEventListener('click', e => {
+    if (e.target === masterModal) closeMasterModal();
+  });
+
+  // Escape キーで閉じる
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && masterModal.style.display !== 'none') {
+      closeMasterModal();
+    }
+  });
+
+  // タブ切り替え
+  document.querySelectorAll('.modal-tab').forEach(tab => {
+    tab.addEventListener('click', () => switchTab(tab.id.replace('tab-', '')));
+  });
+
+  // 貼り付けテキストエリア入力 → リアルタイムバリデーション
+  masterCsvTextarea.addEventListener('input', () => {
+    _pendingCsvText = masterCsvTextarea.value;
+    validateAndPreview(_pendingCsvText);
+  });
+
+  // ファイルドロップゾーン
+  fileDropZone.addEventListener('click', () => masterFileInput.click());
+  fileDropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    fileDropZone.classList.add('drag-over');
+  });
+  fileDropZone.addEventListener('dragleave', () => {
+    fileDropZone.classList.remove('drag-over');
+  });
+  fileDropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    fileDropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) readFile(file);
+  });
+  masterFileInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) readFile(file);
+  });
+
+  // 適用ボタン
+  masterApplyBtn.addEventListener('click', handleMasterApply);
+
+  // リセットボタン
+  masterResetBtn.addEventListener('click', handleMasterReset);
+
+  // コピーボタン
+  copyCurrentMasterBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(currentMasterTextarea.value)
+      .then(() => {
+        copyCurrentMasterBtn.textContent = '✓ コピーしました';
+        setTimeout(() => { copyCurrentMasterBtn.textContent = '📋 CSVをコピー'; }, 2000);
+      })
+      .catch(() => {
+        currentMasterTextarea.select();
+        document.execCommand('copy');
+      });
+  });
+
+  // ダウンロードボタン
+  downloadCurrentMasterBtn.addEventListener('click', () => {
+    const csv = currentMasterTextarea.value;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = isCustomMasterActive() ? 'mpcc_custom_master.csv' : 'mpcc_initial_master.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+/** モーダルを開く */
+function openMasterModal() {
+  _pendingCsvText = '';
+  _activeTab = 'paste';
+
+  // 状態表示を更新
+  updateModalMasterStatus();
+
+  // テキストエリアをクリア
+  masterCsvTextarea.value = '';
+  if (masterFileTextarea) masterFileTextarea.value = '';
+  if (fileReadResult)     fileReadResult.style.display = 'none';
+  masterValidationResult.style.display = 'none';
+  masterApplyBtn.disabled = true;
+
+  // 「現在のマスタ確認」タブの内容を更新
+  currentMasterTextarea.value = masterToCsv(getActiveMaster());
+
+  // タブを貼り付けに戻す
+  switchTab('paste');
+
+  masterModal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => masterCsvTextarea.focus(), 100);
+}
+
+/** モーダルを閉じる */
+function closeMasterModal() {
+  masterModal.style.display = 'none';
+  document.body.style.overflow = '';
+  masterFileInput.value = '';
+}
+
+/** タブ切り替え */
+function switchTab(tabName) {
+  _activeTab = tabName;
+  document.querySelectorAll('.modal-tab').forEach(t => {
+    const isActive = t.id === `tab-${tabName}`;
+    t.classList.toggle('active', isActive);
+    t.setAttribute('aria-selected', isActive);
+  });
+  document.querySelectorAll('.modal-panel').forEach(p => {
+    p.classList.toggle('active', p.id === `panel-${tabName}`);
+  });
+
+  // 現在のマスタタブを開いたとき内容を最新化
+  if (tabName === 'current') {
+    currentMasterTextarea.value = masterToCsv(getActiveMaster());
+    masterValidationResult.style.display = 'none';
+    masterApplyBtn.disabled = true;
+  }
+  // 貼り付けタブに戻ったときは既入力があればバリデーション維持
+  if (tabName === 'paste' && masterCsvTextarea.value.trim()) {
+    validateAndPreview(masterCsvTextarea.value);
+  }
+}
+
+/** ファイル読み込み */
+function readFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result;
+    masterFileTextarea.value = text;
+    fileReadInfo.innerHTML = `✓ 読み込み完了：<strong>${escapeHtml(file.name)}</strong>（${text.split('\n').filter(l=>l.trim()).length} 行）`;
+    fileReadResult.style.display = 'block';
+    _pendingCsvText = text;
+    validateAndPreview(text);
+  };
+  reader.onerror = () => {
+    fileReadInfo.innerHTML = `<span style="color:var(--color-error);">✗ ファイルの読み込みに失敗しました</span>`;
+    fileReadResult.style.display = 'block';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+/** バリデーション実行＋プレビュー表示 */
+function validateAndPreview(csvText) {
+  masterValidationResult.style.display = 'block';
+
+  if (!csvText.trim()) {
+    masterValidationResult.innerHTML = '';
+    masterValidationResult.style.display = 'none';
+    masterApplyBtn.disabled = true;
+    return;
+  }
+
+  const { data, errors, warnings } = parseCsvToMaster(csvText);
+  const hasError = errors.length > 0;
+  const hasWarn  = warnings.length > 0;
+
+  let boxClass = 'validation-box--ok';
+  let title = `✓ ${data.length} 件のデータを確認しました。問題なし。`;
+  if (hasError) {
+    boxClass = 'validation-box--error';
+    title = `✗ エラーがあります（${errors.length} 件）。修正してから適用してください。`;
+  } else if (hasWarn) {
+    boxClass = 'validation-box--warn';
+    title = `△ ${data.length} 件を確認しました。注意事項があります。`;
+  }
+
+  let html = `<div class="validation-box ${boxClass}">
+    <div class="validation-box__title">${escapeHtml(title)}</div>`;
+
+  if (errors.length > 0) {
+    html += `<ul>${errors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`;
+  }
+  if (warnings.length > 0) {
+    html += `<ul>${warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`;
+  }
+
+  if (!hasError && data.length > 0) {
+    // プレビュー（先頭3件）
+    html += `<div style="margin-top:8px; font-size:12px; opacity:0.8;">
+      先頭 ${Math.min(3, data.length)} 件のプレビュー：<br>
+      <code>${data.slice(0, 3).map(p =>
+        `${escapeHtml(p.code)} / ${escapeHtml(p.name)} / ${p.perCase}個/ケース`
+      ).join('<br>')}</code>
+    </div>`;
+  }
+
+  html += `</div>`;
+  masterValidationResult.innerHTML = html;
+
+  // エラーなし＆1件以上あれば適用ボタンを有効化
+  masterApplyBtn.disabled = hasError || data.length === 0;
+}
+
+/** マスタを適用する */
+function handleMasterApply() {
+  const csvText = _pendingCsvText || masterCsvTextarea.value;
+  if (!csvText.trim()) return;
+
+  const { data, errors } = parseCsvToMaster(csvText);
+  if (errors.length > 0 || data.length === 0) return;
+
+  if (!confirm(`${data.length} 件の商品データでマスタを上書きします。よろしいですか？\n\n※ 現在のマスタは置き換えられます。`)) return;
+
+  applyCustomMaster(data);
+  closeMasterModal();
+  updateMasterStatusBadge();
+
+  // 成功通知
+  showToast(`✓ マスタを ${data.length} 件で更新しました`, 'ok');
+}
+
+/** 初期マスタに戻す */
+function handleMasterReset() {
+  const isCustom = isCustomMasterActive();
+  const msg = isCustom
+    ? `カスタムマスタを削除して初期マスタ（30件）に戻します。よろしいですか？`
+    : `現在すでに初期マスタ（30件）が使用されています。`;
+
+  if (!isCustom) { alert(msg); return; }
+  if (!confirm(msg)) return;
+
+  applyInitialMaster();
+  closeMasterModal();
+  updateMasterStatusBadge();
+  showToast('✓ 初期マスタ（30件）に戻しました', 'ok');
+}
+
+/** マスタ状態バッジを更新（入力ページのボタン下） */
+function updateMasterStatusBadge() {
+  if (!masterStatusBadge || !masterEditBtn) return;
+  const isCustom = isCustomMasterActive();
+  const count = getActiveMaster().length;
+
+  if (isCustom) {
+    masterStatusBadge.style.display = 'block';
+    masterStatusBadge.innerHTML = `
+      <span class="master-badge master-badge--custom">
+        ⚠ カスタムマスタ使用中（${count} 件）
+      </span>`;
+    masterEditBtn.classList.add('is-custom');
+  } else {
+    masterStatusBadge.style.display = 'none';
+    masterEditBtn.classList.remove('is-custom');
+  }
+}
+
+/** モーダル内のマスタ状態表示を更新 */
+function updateModalMasterStatus() {
+  if (!modalMasterStatus) return;
+  const isCustom = isCustomMasterActive();
+  const count = getActiveMaster().length;
+
+  if (isCustom) {
+    modalMasterStatus.innerHTML = `
+      <span class="master-badge master-badge--custom">
+        ⚠ カスタムマスタ使用中（${count} 件）
+      </span>
+      <span style="font-size:12px; color:var(--color-text-muted); margin-left:8px;">
+        「初期マスタに戻す」で初期30件に戻せます
+      </span>`;
+  } else {
+    modalMasterStatus.innerHTML = `
+      <span class="master-badge master-badge--default">
+        ✓ 初期マスタ使用中（${count} 件）
+      </span>
+      <span style="font-size:12px; color:var(--color-text-muted); margin-left:8px;">
+        CSVを貼り付けるか、ファイルを読み込んで上書きできます
+      </span>`;
+  }
+}
+
+/** トースト通知 */
+function showToast(message, type = 'ok') {
+  const existing = document.querySelector('.toast-notification');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.className = 'toast-notification';
+  const colorMap = { ok: 'var(--color-ok)', error: 'var(--color-error)', warning: 'var(--color-warning)' };
+  toast.style.cssText = `
+    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+    background: ${colorMap[type] || colorMap.ok}; color: #fff;
+    padding: 12px 20px; border-radius: 8px; font-size: 14px; font-weight: 700;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    animation: slideUp 0.2s ease;
+    max-width: 320px;
+  `;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
 }

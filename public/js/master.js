@@ -1,9 +1,14 @@
 /**
  * MPCC - 商品マスタデータ
  * 学習済み商品マスタ（過去に整合確認済み）
+ *
+ * ランタイムマスタ：localStorage に保存されたデータがあれば優先して使用する。
+ * PRODUCT_MASTER は「初期マスタ」として常に保持し、リセット時に参照する。
  */
 
-export const PRODUCT_MASTER = [
+export const STORAGE_KEY = 'mpcc_custom_master';
+
+export const INITIAL_MASTER = [
   { code: "279803", name: "プラス糀 生みそ 糀美人熟甘", perCase: 8, aliases: [] },
   { code: "412110", name: "プラス糀 生塩糀 お徳用", perCase: 5, aliases: [] },
   { code: "412150", name: "プラス糀 糀甘酒LL ゆず", perCase: 18, aliases: [] },
@@ -42,6 +47,53 @@ export const PRODUCT_MASTER = [
 ];
 
 /**
+ * 現在有効なマスタを返す
+ * localStorage にカスタムマスタがあればそちらを優先する
+ */
+export function getActiveMaster() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (_) { /* 読み込み失敗時は初期マスタを使用 */ }
+  return INITIAL_MASTER;
+}
+
+/**
+ * カスタムマスタを localStorage に保存する
+ * @param {Array} master
+ */
+export function saveCustomMaster(master) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(master));
+}
+
+/**
+ * カスタムマスタを削除して初期マスタに戻す
+ */
+export function resetToInitialMaster() {
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+/**
+ * 現在カスタムマスタが有効かどうか
+ */
+export function isCustomMasterActive() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) && parsed.length > 0;
+    }
+  } catch (_) {}
+  return false;
+}
+
+// 後方互換のため PRODUCT_MASTER も export（checker.js等から参照）
+export const PRODUCT_MASTER = getActiveMaster();
+
+/**
  * 類似名称の注意組み合わせ（コードが近い・名前が似ている）
  */
 export const SIMILAR_PRODUCT_PAIRS = [
@@ -56,20 +108,20 @@ export const SIMILAR_PRODUCT_PAIRS = [
 ];
 
 /**
- * コードで商品を検索
+ * コードで商品を検索（常に最新のアクティブマスタを参照）
  */
 export function findByCode(code) {
   const normalized = String(code).trim();
-  return PRODUCT_MASTER.find(p => p.code === normalized) || null;
+  return getActiveMaster().find(p => p.code === normalized) || null;
 }
 
 /**
  * 正規化済み名前でマスタを検索（完全一致 or エイリアス一致）
  */
 export function findByNormalizedName(normalizedName) {
-  return PRODUCT_MASTER.find(p => {
+  return getActiveMaster().find(p => {
     if (normalizeName(p.name) === normalizedName) return true;
-    return p.aliases.some(a => normalizeName(a) === normalizedName);
+    return (p.aliases || []).some(a => normalizeName(a) === normalizedName);
   }) || null;
 }
 

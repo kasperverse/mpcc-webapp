@@ -5,6 +5,7 @@
 
 import {
   PRODUCT_MASTER,
+  getActiveMaster,
   findByCode,
   findByNormalizedName,
   normalizeName,
@@ -207,7 +208,7 @@ export function checkItem(parsed) {
 function findClosestProduct(normalizedName, excludeCode) {
   let best = null;
   let bestSim = 0.65; // しきい値
-  for (const p of PRODUCT_MASTER) {
+  for (const p of getActiveMaster()) {
     if (p.code === excludeCode) continue;
     const sim = levenshteinSimilarity(normalizedName, normalizeName(p.name));
     if (sim > bestSim) {

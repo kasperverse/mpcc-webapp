@@ -105,10 +105,16 @@ FD タニタ食堂監修 オクラとめかぶ(671333)：1ケース：80
         <button class="btn btn--secondary" id="sample-all-btn" type="button" title="全判定パターンを含むデモデータを一括入力します">
           デモデータを一括入力
         </button>
+        <button class="btn btn--master" id="master-edit-btn" type="button" title="商品マスタをCSVで上書きします">
+          <span aria-hidden="true">📋</span>
+          マスターを上書きする
+        </button>
         <button class="btn btn--ghost btn--small" type="button" onclick="document.getElementById('input-textarea').value=''; document.getElementById('line-count').textContent='';">
           クリア
         </button>
       </div>
+      <!-- マスタ状態バッジ -->
+      <div id="master-status-badge" style="display:none; margin-top:10px;"></div>
     </section>
 
     <!-- サンプル入力セクション -->
@@ -173,6 +179,119 @@ FD タニタ食堂監修 オクラとめかぶ(671333)：1ケース：80
 
   </div><!-- /.main-content -->
 </main>
+
+<!-- ============================================================
+     マスタ上書きモーダル
+     ============================================================ -->
+<div class="modal-overlay" id="master-modal" role="dialog" aria-modal="true" aria-labelledby="master-modal-title" style="display:none;">
+  <div class="modal">
+
+    <!-- モーダルヘッダー -->
+    <div class="modal__header">
+      <h2 class="modal__title" id="master-modal-title">
+        <span aria-hidden="true">📋</span> 商品マスターを上書きする
+      </h2>
+      <button class="modal__close" id="master-modal-close" type="button" aria-label="閉じる">✕</button>
+    </div>
+
+    <!-- モーダルボディ -->
+    <div class="modal__body">
+
+      <!-- 現在のマスタ状態 -->
+      <div class="modal-master-status" id="modal-master-status"></div>
+
+      <!-- 入力方法タブ -->
+      <div class="modal-tabs" role="tablist">
+        <button class="modal-tab active" id="tab-paste" role="tab" aria-selected="true" aria-controls="panel-paste" type="button">テキスト貼り付け</button>
+        <button class="modal-tab" id="tab-file" role="tab" aria-selected="false" aria-controls="panel-file" type="button">ファイル読み込み</button>
+        <button class="modal-tab" id="tab-current" role="tab" aria-selected="false" aria-controls="panel-current" type="button">現在のマスタ確認</button>
+      </div>
+
+      <!-- タブパネル: 貼り付け -->
+      <div class="modal-panel active" id="panel-paste" role="tabpanel" aria-labelledby="tab-paste">
+        <p class="modal-desc">
+          下記のCSV形式で貼り付けてください。ヘッダー行は自動で読み飛ばします。<br>
+          <strong>形式：</strong><code>商品コード, 商品名, 1ケースあたり個数[, 別名1, 別名2...]</code>
+        </p>
+        <div class="modal-format-hint">
+          412294,プラス糀 生塩糀,32<br>
+          412310,プラス糀 生塩糀パウダーボトル,24,プラス糀 生塩糀パウダー ボトル<br>
+          764860,業務用 プラス糀 米糀粉末,10
+        </div>
+        <textarea
+          id="master-csv-textarea"
+          class="modal-textarea"
+          placeholder="商品コード,商品名,1ケースあたり個数&#10;412294,プラス糀 生塩糀,32&#10;412310,プラス糀 生塩糀パウダーボトル,24,プラス糀 生塩糀パウダー ボトル"
+          spellcheck="false"
+          autocomplete="off"
+          rows="10"
+        ></textarea>
+      </div>
+
+      <!-- タブパネル: ファイル -->
+      <div class="modal-panel" id="panel-file" role="tabpanel" aria-labelledby="tab-file">
+        <p class="modal-desc">
+          CSVファイル（.csv）またはテキストファイル（.txt）を選択してください。<br>
+          ファイルの内容がテキストエリアに読み込まれます。
+        </p>
+        <div class="file-drop-zone" id="file-drop-zone">
+          <div class="file-drop-zone__icon" aria-hidden="true">📁</div>
+          <div class="file-drop-zone__text">クリックしてファイルを選択<br><small>またはここにドラッグ＆ドロップ</small></div>
+          <input type="file" id="master-file-input" accept=".csv,.txt" style="display:none;" aria-label="CSVファイルを選択">
+        </div>
+        <div id="file-read-result" style="display:none; margin-top:12px;">
+          <div class="file-read-info" id="file-read-info"></div>
+          <textarea
+            id="master-file-textarea"
+            class="modal-textarea"
+            style="margin-top:8px;"
+            spellcheck="false"
+            rows="8"
+            readonly
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- タブパネル: 現在のマスタ確認 -->
+      <div class="modal-panel" id="panel-current" role="tabpanel" aria-labelledby="tab-current">
+        <p class="modal-desc">
+          現在有効なマスタの内容です。このCSVをコピーして編集後、「テキスト貼り付け」タブから上書きできます。
+        </p>
+        <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+          <button class="btn btn--secondary btn--small" id="copy-current-master-btn" type="button">📋 CSVをコピー</button>
+          <button class="btn btn--secondary btn--small" id="download-current-master-btn" type="button">⬇ CSVをダウンロード</button>
+        </div>
+        <textarea
+          id="current-master-textarea"
+          class="modal-textarea"
+          spellcheck="false"
+          rows="12"
+          readonly
+        ></textarea>
+      </div>
+
+      <!-- バリデーション結果 -->
+      <div id="master-validation-result" style="display:none; margin-top:14px;"></div>
+
+    </div><!-- /.modal__body -->
+
+    <!-- モーダルフッター -->
+    <div class="modal__footer">
+      <div class="modal__footer-left">
+        <button class="btn btn--danger btn--small" id="master-reset-btn" type="button" title="初期マスタ（30件）に戻します">
+          🔄 初期マスタに戻す
+        </button>
+      </div>
+      <div class="modal__footer-right">
+        <button class="btn btn--ghost" id="master-cancel-btn" type="button">キャンセル</button>
+        <button class="btn btn--primary" id="master-apply-btn" type="button">
+          ✔ 確認してマスタを上書き
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /.modal -->
+</div>
 
 <!-- ============================================================
      結果ページ
