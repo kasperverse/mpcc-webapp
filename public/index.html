@@ -102,8 +102,8 @@ FD タニタ食堂監修 オクラとめかぶ(671333)：1ケース：80
           <span aria-hidden="true">🔍</span>
           チェックする
         </button>
-        <button class="btn btn--secondary" id="sample-all-btn" type="button">
-          全サンプルを入力
+        <button class="btn btn--secondary" id="sample-all-btn" type="button" title="全判定パターンを含むデモデータを一括入力します">
+          デモデータを一括入力
         </button>
         <button class="btn btn--ghost btn--small" type="button" onclick="document.getElementById('input-textarea').value=''; document.getElementById('line-count').textContent='';">
           クリア
@@ -113,52 +113,52 @@ FD タニタ食堂監修 オクラとめかぶ(671333)：1ケース：80
 
     <!-- サンプル入力セクション -->
     <section class="sample-section" aria-labelledby="sample-label">
-      <h2 class="sample-section__title" id="sample-label">サンプルデータ</h2>
+      <h2 class="sample-section__title" id="sample-label">判定パターンを試す</h2>
       <div class="sample-chips" role="list">
         <button
           class="sample-chip"
           data-sample="normal"
           type="button"
           role="listitem"
-          title="問題なし3件のサンプルを追加"
+          title="問題なしのデータを追加して整合チェックの動作を確認します"
         >
-          ✓ 正常例
+          ✓ 問題なしを確認する
         </button>
         <button
           class="sample-chip"
           data-sample="variant"
           type="button"
           role="listitem"
-          title="表記ゆれのサンプルを追加"
+          title="商品名の表記ゆれを検出する動作を確認します"
         >
-          ! 表記ゆれ例
+          ! 名前の揺れを検出する
         </button>
         <button
           class="sample-chip"
           data-sample="mismatch"
           type="button"
           role="listitem"
-          title="入り数不整合のサンプルを追加"
+          title="ケース数・入り数のミスを検出する動作を確認します"
         >
-          ✗ 不整合例
+          ✗ ケース数ミスを検出する
         </button>
         <button
           class="sample-chip"
           data-sample="similar"
           type="button"
           role="listitem"
-          title="類似名称の注意サンプルを追加"
+          title="似た名前の別商品との混同を検出する動作を確認します"
         >
-          ! 類似名称注意例
+          ! 似た商品の混同を検出する
         </button>
         <button
           class="sample-chip"
           data-sample="unknown"
           type="button"
           role="listitem"
-          title="未知商品（外部参照）のサンプルを追加"
+          title="マスタ未登録の商品を外部参照する動作を確認します"
         >
-          ? 未知商品例
+          ? 登録外商品を調べる
         </button>
       </div>
     </section>
