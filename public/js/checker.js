@@ -102,18 +102,28 @@ export function checkItem(parsed) {
 
   if (inputNameNorm && inputNameNorm !== masterNameNorm) {
     // エイリアスとも照合
-    const aliasMatch = masterProduct.aliases.some(
+    const matchedAlias = masterProduct.aliases.find(
       a => normalizeName(a) === inputNameNorm
     );
 
-    if (!aliasMatch) {
-      // 完全一致でもエイリアス一致でもない → 表記ゆれの可能性
+    if (matchedAlias) {
+      // エイリアスに一致 = 既知の表記ゆれ → 必ず「注意」として表示
+      nameVariantWarning = true;
+      nameVariantDetail = {
+        inputName: parsed.productName,
+        masterName: masterProduct.name,
+        isKnownAlias: true
+      };
+    } else {
+      // エイリアスにも一致しない → 類似度で判断
       const similarity = levenshteinSimilarity(inputNameNorm, masterNameNorm);
       if (similarity > 0.7) {
+        // 類似度が高い = 表記ゆれの可能性
         nameVariantWarning = true;
         nameVariantDetail = {
           inputName: parsed.productName,
-          masterName: masterProduct.name
+          masterName: masterProduct.name,
+          isKnownAlias: false
         };
       } else {
         // 類似度が低い = コードと名前の組み合わせが怪しい
@@ -166,10 +176,13 @@ export function checkItem(parsed) {
       result.status = STATUS.WARNING;
       result.statusLabel = '注意';
     }
+    const mainText = nameVariantDetail.isKnownAlias
+      ? `商品名の表記ゆれが検出されました（既知の別表記）`
+      : `商品名の表記ゆれの可能性があります`;
     result.messages.push({
       type: 'warning',
-      text: `商品名の表記ゆれの可能性があります`,
-      detail: `既知の表記：「${nameVariantDetail.masterName}」`
+      text: mainText,
+      detail: `正式な表記：「${nameVariantDetail.masterName}」`
     });
   }
 
