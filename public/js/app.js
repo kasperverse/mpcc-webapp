@@ -573,8 +573,70 @@ function escapeHtml(str) {
 // ============================================================
 
 function initMasterModal() {
-  // 開くボタン
-  masterEditBtn.addEventListener('click', openMasterModal);
+  // 開くボタン → パスワード確認モーダルを先に表示
+  masterEditBtn.addEventListener('click', openPasswordModal);
+
+  // パスワードモーダル制御
+  const passwordModal   = $('password-modal');
+  const passwordInput   = $('password-input');
+  const passwordError   = $('password-error');
+  const passwordSubmit  = $('password-submit-btn');
+  const passwordCancel  = $('password-cancel-btn');
+  const passwordClose   = $('password-modal-close');
+
+  const CORRECT_PASSWORD = 'mmppcccc';
+
+  function openPasswordModal() {
+    passwordInput.value = '';
+    passwordInput.classList.remove('is-error');
+    passwordError.style.display = 'none';
+    passwordModal.style.display = 'flex';
+    setTimeout(() => passwordInput.focus(), 50);
+  }
+
+  function closePasswordModal() {
+    passwordModal.style.display = 'none';
+    passwordInput.value = '';
+    passwordInput.classList.remove('is-error');
+    passwordError.style.display = 'none';
+  }
+
+  function submitPassword() {
+    if (passwordInput.value === CORRECT_PASSWORD) {
+      closePasswordModal();
+      openMasterModal();
+    } else {
+      passwordInput.classList.remove('is-error');
+      // 再アニメーションのため一瞬外してから付ける
+      requestAnimationFrame(() => {
+        passwordInput.classList.add('is-error');
+      });
+      passwordError.style.display = 'block';
+      passwordInput.value = '';
+      passwordInput.focus();
+    }
+  }
+
+  passwordSubmit.addEventListener('click', submitPassword);
+  passwordCancel.addEventListener('click', closePasswordModal);
+  passwordClose.addEventListener('click', closePasswordModal);
+
+  passwordInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submitPassword();
+    }
+  });
+
+  passwordModal.addEventListener('click', e => {
+    if (e.target === passwordModal) closePasswordModal();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && passwordModal.style.display !== 'none') {
+      closePasswordModal();
+    }
+  });
 
   // 閉じる系
   masterModalClose.addEventListener('click', closeMasterModal);

@@ -181,6 +181,47 @@ FD タニタ食堂監修 オクラとめかぶ(671333)：1ケース：80
 </main>
 
 <!-- ============================================================
+     パスワード確認モーダル
+     ============================================================ -->
+<div class="modal-overlay" id="password-modal" role="dialog" aria-modal="true" aria-labelledby="password-modal-title" style="display:none;">
+  <div class="modal modal--narrow">
+    <div class="modal__header">
+      <h2 class="modal__title" id="password-modal-title">
+        <span aria-hidden="true">🔒</span> この機能にはパスワードが必要です
+      </h2>
+      <button class="modal__close" id="password-modal-close" type="button" aria-label="閉じる">✕</button>
+    </div>
+    <div class="modal__body">
+      <p style="margin-bottom:14px; color:var(--color-text-secondary); font-size:14px;">
+        商品マスターの上書きは管理者のみ行えます。<br>パスワードを入力してください。
+      </p>
+      <div style="position:relative;">
+        <input
+          type="password"
+          id="password-input"
+          class="password-input"
+          placeholder="パスワードを入力"
+          autocomplete="current-password"
+          aria-label="パスワード"
+        >
+      </div>
+      <div id="password-error" class="password-error" style="display:none;" role="alert" aria-live="assertive">
+        パスワードが違います
+      </div>
+    </div>
+    <div class="modal__footer">
+      <div class="modal__footer-left"></div>
+      <div class="modal__footer-right">
+        <button class="btn btn--ghost" id="password-cancel-btn" type="button">キャンセル</button>
+        <button class="btn btn--primary" id="password-submit-btn" type="button">
+          🔓 確認する
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
      マスタ上書きモーダル
      ============================================================ -->
 <div class="modal-overlay" id="master-modal" role="dialog" aria-modal="true" aria-labelledby="master-modal-title" style="display:none;">
