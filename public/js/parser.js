@@ -5,7 +5,7 @@
 
 /**
  * 1行を解析してオブジェクトを返す
- * フォーマット：商品名（商品コード）：ケース数ケース：入り数（個）
+ * フォーマット：商品名（商品コード）：ケース数：入り数（個）
  *
  * 許容するパターン例：
  * - プラス糀 生塩糀(412294)：2ケース：64
@@ -24,7 +24,7 @@ export function parseLine(line) {
   // 全角→半角の正規化（解析用）
   const normalized = normalizeForParsing(raw);
 
-  // パターン1: 商品名(コード)：ケース数ケース：入り数
+  // パターン1: 商品名(コード)：ケース数：入り数
   // コード部分を抽出: (...) または （...）の中の数字6桁
   const codeMatch = normalized.match(/\((\d{5,7})\)/);
   const code = codeMatch ? codeMatch[1] : null;
